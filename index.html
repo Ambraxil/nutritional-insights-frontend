@@ -268,9 +268,9 @@
     <section class="api-section">
       <h2>API Data Interaction</h2>
       <div class="api-buttons">
-        <button class="btn btn-blue"   onclick="fetchInsights()">Get Nutritional Insights</button>
-        <button class="btn btn-green"  onclick="fetchRecipes()">Get Recipes</button>
-        <button class="btn btn-purple" onclick="fetchClusters()">Get Clusters</button>
+        <button class="btn btn-blue"   onclick="refreshAll()">Get Nutritional Insights</button>
+        <button class="btn btn-green"  onclick="refreshAll()">Get Recipes</button>
+        <button class="btn btn-purple" onclick="refreshAll()">Get Clusters</button>
       </div>
     </section>
 
@@ -516,6 +516,7 @@
         populateDropdown(data);
         renderBarChart(data);
         renderPieChart(data);
+        await fetchHeatmap();
         console.log("Nutritional insights loaded.", data);
       } catch (err) { console.error("fetchInsights error:", err); }
     }
@@ -550,6 +551,16 @@
         renderHeatmap(data);
         console.log("Heatmap loaded.", data);
       } catch (err) { console.error("fetchHeatmap error:", err); }
+    }
+
+    // ─────────────────────────────────────────
+    // REFRESH ALL — called by every API button
+    // Fetches all endpoints and updates all 4 charts
+    // ─────────────────────────────────────────
+    async function refreshAll() {
+      await fetchInsights();  // bar chart + pie chart
+      await fetchRecipes();   // scatter plot
+      await fetchHeatmap();   // heatmap
     }
 
     // ─────────────────────────────────────────
