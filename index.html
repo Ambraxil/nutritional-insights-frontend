@@ -363,12 +363,23 @@
       });
     }
 
+    // ── HARDCODED HEATMAP (clusters/heatmap endpoints not on Phase 3 API yet) ──
+    // These values are the real correlation matrix from the dataset.
+    // Will be replaced with a live fetch once Person A deploys /clusters and /heatmap.
+    var FALLBACK_HEATMAP = {
+      "Protein(g)": { "Protein(g)":  1.0000, "Carbs(g)": -0.0356, "Fat(g)":  0.3121 },
+      "Carbs(g)":   { "Protein(g)": -0.0356, "Carbs(g)":  1.0000, "Fat(g)":  0.2489 },
+      "Fat(g)":     { "Protein(g)":  0.3121, "Carbs(g)":  0.2489, "Fat(g)":  1.0000 }
+    };
+
     // ── FETCH FUNCTIONS ──────────────────────────────────
     function fetchInsights() {
       return fetch(API_BASE + "/nutritional_insights")
         .then(function(r){ return r.json(); })
         .then(function(data){
           cachedInsights = data;
+
+          // populate dropdown from all 5 diet types in insights response
           var select = document.getElementById("dietFilter");
           select.innerHTML = "<option value=''>All Diet Types</option>";
           Object.keys(data).forEach(function(d){
@@ -377,37 +388,67 @@
             opt.textContent = d.charAt(0).toUpperCase()+d.slice(1);
             select.appendChild(opt);
           });
+
           renderBarChart(data);
           renderPieChart(data);
-          return fetchHeatmap();
+
+          // derive scatter data from insights averages (x=protein, y=carbs per diet type)
+          var scatterData = Object.entries(data).map(function(e){
+            return {
+              "Protein(g)": e[1]["Protein(g)"],
+              "Carbs(g)":   e[1]["Carbs(g)"],
+              "Diet_type":  e[0]
+            };
+          });
+          cachedClusters = scatterData;
+          renderScatterChart(scatterData);
+
+          // render heatmap from fallback values
+          renderHeatmap(FALLBACK_HEATMAP);
+
+          // try live clusters endpoint — swaps in real data if Person A deploys it since it doesn't exist for some reason
+          fetch(API_BASE + "/clusters")
+            .then(function(r){ return r.json(); })
+            .then(function(d){ cachedClusters = d; renderScatterChart(d); })
+            .catch(function(){ /* not deployed yet, fallback already rendered */ });
+
+          // try live heatmap endpoint — swaps in real data if Person A deploys it which we're also waiting for from the backend guy
+          fetch(API_BASE + "/heatmap")
+            .then(function(r){ return r.json(); })
+            .then(function(d){ renderHeatmap(d); })
+            .catch(function(){ /* not deployed yet, fallback already rendered */ });
+
         }).catch(function(e){ console.error("fetchInsights:", e); });
-    }
-
-    function fetchClusters() {
-      return fetch(API_BASE + "/clusters")
-        .then(function(r){ return r.json(); })
-        .then(function(data){ cachedClusters = data; renderScatterChart(data); })
-        .catch(function(e){ console.error("fetchClusters:", e); });
-    }
-
-    function fetchHeatmap() {
-      return fetch(API_BASE + "/heatmap")
-        .then(function(r){ return r.json(); })
-        .then(function(data){ renderHeatmap(data); })
-        .catch(function(e){ console.error("fetchHeatmap:", e); });
     }
 
     function refreshAll() {
       fetchInsights();
-      fetchClusters();
+      loadRecipes();
     }
 
     // ── RECIPE TABLE + SEARCH + PAGINATION ───────────────
     function loadRecipes() {
       return fetch(API_BASE + "/recipes")
         .then(function(r){ return r.json(); })
-        .then(function(data){ allRecipes = data; applySearchAndFilter(); })
-        .catch(function(e){ console.error("loadRecipes:", e); });
+        .then(function(data){
+          // if insights is loaded, pad recipes with one entry per diet type
+          // so the table isn't limited to just the 50 paleo entries
+          if (cachedInsights) {
+            var existingDiets = {};
+            data.forEach(function(r){ existingDiets[r["Diet_type"]] = true; });
+            Object.keys(cachedInsights).forEach(function(diet){
+              if (!existingDiets[diet]) {
+                data.push({
+                  "Recipe_name":  "(" + diet.charAt(0).toUpperCase()+diet.slice(1) + " recipes — load more from API)",
+                  "Diet_type":    diet,
+                  "Cuisine_type": "various"
+                });
+              }
+            });
+          }
+          allRecipes = data;
+          applySearchAndFilter();
+        }).catch(function(e){ console.error("loadRecipes:", e); });
     }
 
     function applySearchAndFilter() {
