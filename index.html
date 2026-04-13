@@ -251,8 +251,8 @@
     }
 
     // ── API URLS ─────────────────────────────────────────
-    const API_BASE = "https://dietinsightsapi-west.azurewebsites.net/api";
-    const API_P3   = "https://moin-processor-p3-h0f2azajhnh9g5fu.westus3-01.azurewebsites.net/api";
+    const API_BASE = "https://moin-processor-p3-h0f2azajhnh9g5fu.westus3-01.azurewebsites.net/api";
+    
     const PER_PAGE = 10;
 
     // ── STATE ────────────────────────────────────────────
@@ -404,7 +404,7 @@
 
     // ── RECIPE TABLE + SEARCH + PAGINATION ───────────────
     function loadRecipes() {
-      return fetch(API_P3 + "/recipes")
+      return fetch(API_BASE + "/recipes")
         .then(function(r){ return r.json(); })
         .then(function(data){ allRecipes = data; applySearchAndFilter(); })
         .catch(function(e){ console.error("loadRecipes:", e); });
