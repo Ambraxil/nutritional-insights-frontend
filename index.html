@@ -6,6 +6,9 @@
   <title>Nutritional Insights</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Firebase compat (no module imports needed) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; min-height: 100vh; display: flex; flex-direction: column; }
@@ -192,14 +195,10 @@
     <footer>&#169; 2025 Nutritional Insights. All Rights Reserved.</footer>
   </div>
 
-  <!-- ALL SCRIPTS IN ONE BLOCK — avoids module scope isolation issues -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, GithubAuthProvider, signInWithPopup }
-      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-    // ── FIREBASE SETUP ─────────────────────────────
-    const app  = initializeApp({
+  <!-- SINGLE REGULAR SCRIPT — no module scope issues -->
+  <script>
+    // ── FIREBASE INIT (compat mode — no imports needed) ──
+    firebase.initializeApp({
       apiKey:            "AIzaSyBwMdd7WwmnBG_Fzl4n2_Tn8Aum209kHqg",
       authDomain:        "diet-dashboard-be3ce.firebaseapp.com",
       projectId:         "diet-dashboard-be3ce",
@@ -207,83 +206,88 @@
       messagingSenderId: "254710104011",
       appId:             "1:254710104011:web:484010675a4d4ac0a6004e"
     });
-    const auth = getAuth(app);
+    const auth = firebase.auth();
 
+    // ── AUTH HELPERS ─────────────────────────────────────
     function showError(msg) {
       const el = document.getElementById("loginError");
-      el.textContent = msg; el.style.display = "block";
+      el.textContent = msg;
+      el.style.display = "block";
     }
 
     function showDashboard(email) {
-      document.getElementById("loginPage").style.display  = "none";
-      document.getElementById("dashboard").style.display  = "flex";
-      document.getElementById("userName").textContent     = email;
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("dashboard").style.display = "flex";
+      document.getElementById("userName").textContent    = email;
       initDashboard();
     }
 
-    // expose auth functions to onclick handlers
-    window.login = async function () {
-      try {
-        const r = await signInWithEmailAndPassword(auth,
-          document.getElementById("email").value,
-          document.getElementById("password").value);
-        showDashboard(r.user.email);
-      } catch (e) { showError(e.message); }
-    };
+    function login() {
+      const email    = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, password)
+        .then(r => showDashboard(r.user.email))
+        .catch(e => showError(e.message));
+    }
 
-    window.googleLogin = async function () {
-      try { const r = await signInWithPopup(auth, new GoogleAuthProvider()); showDashboard(r.user.email); }
-      catch (e) { showError(e.message); }
-    };
+    function googleLogin() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .then(r => showDashboard(r.user.email))
+        .catch(e => showError(e.message));
+    }
 
-    window.githubLogin = async function () {
-      try { const r = await signInWithPopup(auth, new GithubAuthProvider()); showDashboard(r.user.email); }
-      catch (e) { showError(e.message); }
-    };
+    function githubLogin() {
+      const provider = new firebase.auth.GithubAuthProvider();
+      auth.signInWithPopup(provider)
+        .then(r => showDashboard(r.user.email))
+        .catch(e => showError(e.message));
+    }
 
-    window.doLogout        = function () { location.reload(); };
-    window.togglePassword  = function () {
+    function doLogout()       { location.reload(); }
+    function togglePassword() {
       const p = document.getElementById("password");
       p.type = p.type === "password" ? "text" : "password";
-    };
+    }
 
-    // ── API URLS ───────────────────────────────────
+    // ── API URLS ─────────────────────────────────────────
     const API_BASE = "https://dietinsightsapi-west.azurewebsites.net/api";
     const API_P3   = "https://moin-processor-p3-h0f2azajhnh9g5fu.westus3-01.azurewebsites.net/api";
     const PER_PAGE = 10;
 
-    // ── STATE ──────────────────────────────────────
+    // ── STATE ────────────────────────────────────────────
     let barChartInstance = null, scatterChartInstance = null, pieChartInstance = null;
     let cachedInsights = null, cachedClusters = null;
     let allRecipes = [], filteredData = [], currentPage = 1;
 
-    // ── HEATMAP ────────────────────────────────────
+    // ── HEATMAP ──────────────────────────────────────────
     function renderHeatmap(rawData) {
       const labels = ["Protein(g)", "Carbs(g)", "Fat(g)"];
       const canvas = document.getElementById("heatmapCanvas");
       const area   = document.getElementById("heatmapArea");
       const size   = Math.min(area.clientWidth || 200, area.clientHeight || 200);
       canvas.width = canvas.height = size;
-      const ctx = canvas.getContext("2d"), padding = 55, cellSize = (size - padding) / labels.length;
+      const ctx = canvas.getContext("2d");
+      const padding = 55, cellSize = (size - padding) / labels.length;
       ctx.clearRect(0, 0, size, size);
-      ctx.font = `${Math.max(9, cellSize * 0.18)}px Segoe UI, sans-serif`;
+      ctx.font = Math.max(9, cellSize * 0.18) + "px Segoe UI, sans-serif";
       ctx.textBaseline = "middle";
-      labels.forEach((rowLabel, r) => {
-        labels.forEach((colLabel, c) => {
-          const val = rawData[rowLabel][colLabel];
-          let red, green, blue;
+      labels.forEach(function(rowLabel, r) {
+        labels.forEach(function(colLabel, c) {
+          var val = rawData[rowLabel][colLabel];
+          var red, green, blue;
           if (val >= 0) {
-            red = Math.round(240*val + 255*(1-val));
+            red   = Math.round(240*val + 255*(1-val));
             green = Math.round(165*val + 255*(1-val));
-            blue = Math.round(255*(1-val));
+            blue  = Math.round(255*(1-val));
           } else {
-            const t = -val;
-            red = Math.round(255*(1-t) + 58*t);
+            var t = -val;
+            red   = Math.round(255*(1-t) + 58*t);
             green = Math.round(255*(1-t) + 86*t);
-            blue = Math.round(255*(1-t) + 212*t);
+            blue  = Math.round(255*(1-t) + 212*t);
           }
-          const x = padding + c * cellSize, y = padding + r * cellSize;
-          ctx.fillStyle = `rgb(${red},${green},${blue})`;
+          var x = padding + c * cellSize, y = padding + r * cellSize;
+          ctx.fillStyle = "rgb(" + red + "," + green + "," + blue + ")";
           ctx.fillRect(x, y, cellSize-2, cellSize-2);
           ctx.fillStyle = Math.abs(val) > 0.5 ? "#fff" : "#333";
           ctx.textAlign = "center";
@@ -292,25 +296,26 @@
         ctx.fillStyle = "#444"; ctx.textAlign = "right";
         ctx.fillText(rowLabel.replace("(g)","").trim(), padding-6, padding + r*cellSize + cellSize/2);
       });
-      labels.forEach((col, c) => {
+      labels.forEach(function(col, c) {
         ctx.fillStyle = "#444"; ctx.textAlign = "center";
         ctx.fillText(col.replace("(g)","").trim(), padding + c*cellSize + cellSize/2, padding-10);
       });
     }
 
-    // ── BAR CHART ──────────────────────────────────
-    function renderBarChart(rawData, filterDiet = "") {
+    // ── BAR CHART ────────────────────────────────────────
+    function renderBarChart(rawData, filterDiet) {
+      filterDiet = filterDiet || "";
       if (barChartInstance) barChartInstance.destroy();
-      let entries = Object.entries(rawData);
-      if (filterDiet) entries = entries.filter(([k]) => k.toLowerCase() === filterDiet.toLowerCase());
+      var entries = Object.entries(rawData);
+      if (filterDiet) entries = entries.filter(function(e) { return e[0].toLowerCase() === filterDiet.toLowerCase(); });
       barChartInstance = new Chart(document.getElementById("barChart").getContext("2d"), {
         type: "bar",
         data: {
-          labels: entries.map(([k]) => k.charAt(0).toUpperCase()+k.slice(1)),
+          labels: entries.map(function(e) { return e[0].charAt(0).toUpperCase()+e[0].slice(1); }),
           datasets: [
-            { label:"Protein (g)", data: entries.map(([,v])=>parseFloat(v["Protein(g)"].toFixed(2))), backgroundColor:"#3a56d4" },
-            { label:"Carbs (g)",   data: entries.map(([,v])=>parseFloat(v["Carbs(g)"].toFixed(2))),   backgroundColor:"#3aa76d" },
-            { label:"Fat (g)",     data: entries.map(([,v])=>parseFloat(v["Fat(g)"].toFixed(2))),     backgroundColor:"#f0a500" }
+            { label:"Protein (g)", data: entries.map(function(e){ return parseFloat(e[1]["Protein(g)"].toFixed(2)); }), backgroundColor:"#3a56d4" },
+            { label:"Carbs (g)",   data: entries.map(function(e){ return parseFloat(e[1]["Carbs(g)"].toFixed(2)); }),   backgroundColor:"#3aa76d" },
+            { label:"Fat (g)",     data: entries.map(function(e){ return parseFloat(e[1]["Fat(g)"].toFixed(2)); }),     backgroundColor:"#f0a500" }
           ]
         },
         options: { responsive:true, maintainAspectRatio:false,
@@ -319,15 +324,17 @@
       });
     }
 
-    // ── SCATTER CHART ──────────────────────────────
-    function renderScatterChart(rawData, filterDiet = "") {
+    // ── SCATTER CHART ────────────────────────────────────
+    function renderScatterChart(rawData, filterDiet) {
+      filterDiet = filterDiet || "";
       if (scatterChartInstance) scatterChartInstance.destroy();
-      let filtered = rawData;
-      if (filterDiet) filtered = rawData.filter(r => r["Diet_type"].toLowerCase() === filterDiet.toLowerCase());
+      var filtered = filterDiet
+        ? rawData.filter(function(r){ return r["Diet_type"].toLowerCase() === filterDiet.toLowerCase(); })
+        : rawData;
       scatterChartInstance = new Chart(document.getElementById("scatterChart").getContext("2d"), {
         type: "scatter",
         data: { datasets: [{ label:"Protein vs Carbs",
-          data: filtered.map(r => ({ x:parseFloat(r["Protein(g)"].toFixed(2)), y:parseFloat(r["Carbs(g)"].toFixed(2)) })),
+          data: filtered.map(function(r){ return { x: parseFloat(r["Protein(g)"].toFixed(2)), y: parseFloat(r["Carbs(g)"].toFixed(2)) }; }),
           backgroundColor:"#7b52d4" }]},
         options: { responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{position:"bottom",labels:{font:{size:10}}} },
@@ -338,16 +345,17 @@
       });
     }
 
-    // ── PIE CHART ──────────────────────────────────
-    function renderPieChart(rawData, filterDiet = "") {
+    // ── PIE CHART ────────────────────────────────────────
+    function renderPieChart(rawData, filterDiet) {
+      filterDiet = filterDiet || "";
       if (pieChartInstance) pieChartInstance.destroy();
-      let entries = Object.entries(rawData);
-      if (filterDiet) entries = entries.filter(([k]) => k.toLowerCase() === filterDiet.toLowerCase());
+      var entries = Object.entries(rawData);
+      if (filterDiet) entries = entries.filter(function(e){ return e[0].toLowerCase() === filterDiet.toLowerCase(); });
       pieChartInstance = new Chart(document.getElementById("pieChart").getContext("2d"), {
         type: "pie",
         data: {
-          labels: entries.map(([k]) => k.charAt(0).toUpperCase()+k.slice(1)),
-          datasets: [{ data: entries.map(([,v])=>parseFloat(v["Protein(g)"].toFixed(2))),
+          labels: entries.map(function(e){ return e[0].charAt(0).toUpperCase()+e[0].slice(1); }),
+          datasets: [{ data: entries.map(function(e){ return parseFloat(e[1]["Protein(g)"].toFixed(2)); }),
             backgroundColor:["#3a56d4","#3aa76d","#7b52d4","#f0a500","#e05050"] }]
         },
         options: { responsive:true, maintainAspectRatio:false,
@@ -355,119 +363,111 @@
       });
     }
 
-    // ── FETCH FUNCTIONS ────────────────────────────
-    async function fetchInsights() {
-      try {
-        const data = await (await fetch(`${API_BASE}/nutritional_insights`)).json();
-        cachedInsights = data;
-
-        // populate dropdown from insights keys (all 5 diet types)
-        const select = document.getElementById("dietFilter");
-        select.innerHTML = `<option value="">All Diet Types</option>`;
-        Object.keys(data).forEach(d => {
-          const opt = document.createElement("option");
-          opt.value = d; opt.textContent = d.charAt(0).toUpperCase()+d.slice(1);
-          select.appendChild(opt);
-        });
-
-        renderBarChart(data);
-        renderPieChart(data);
-        await fetchHeatmap();
-      } catch(e) { console.error("fetchInsights:", e); }
+    // ── FETCH FUNCTIONS ──────────────────────────────────
+    function fetchInsights() {
+      return fetch(API_BASE + "/nutritional_insights")
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          cachedInsights = data;
+          var select = document.getElementById("dietFilter");
+          select.innerHTML = "<option value=''>All Diet Types</option>";
+          Object.keys(data).forEach(function(d){
+            var opt = document.createElement("option");
+            opt.value = d;
+            opt.textContent = d.charAt(0).toUpperCase()+d.slice(1);
+            select.appendChild(opt);
+          });
+          renderBarChart(data);
+          renderPieChart(data);
+          return fetchHeatmap();
+        }).catch(function(e){ console.error("fetchInsights:", e); });
     }
 
-    async function fetchClusters() {
-      try {
-        const data = await (await fetch(`${API_BASE}/clusters`)).json();
-        cachedClusters = data;
-        renderScatterChart(data);
-      } catch(e) { console.error("fetchClusters:", e); }
+    function fetchClusters() {
+      return fetch(API_BASE + "/clusters")
+        .then(function(r){ return r.json(); })
+        .then(function(data){ cachedClusters = data; renderScatterChart(data); })
+        .catch(function(e){ console.error("fetchClusters:", e); });
     }
 
-    async function fetchHeatmap() {
-      try {
-        const data = await (await fetch(`${API_BASE}/heatmap`)).json();
-        renderHeatmap(data);
-      } catch(e) { console.error("fetchHeatmap:", e); }
+    function fetchHeatmap() {
+      return fetch(API_BASE + "/heatmap")
+        .then(function(r){ return r.json(); })
+        .then(function(data){ renderHeatmap(data); })
+        .catch(function(e){ console.error("fetchHeatmap:", e); });
     }
 
-    // ── REFRESH ALL (API buttons) ──────────────────
-    window.refreshAll = async function () {
-      await fetchInsights();
-      await fetchClusters();
-    };
-
-    // ── RECIPE TABLE + SEARCH + PAGINATION ─────────
-    async function loadRecipes() {
-      try {
-        const data = await (await fetch(`${API_P3}/recipes`)).json();
-        allRecipes = data;
-        applySearchAndFilter();
-      } catch(e) { console.error("loadRecipes:", e); }
+    function refreshAll() {
+      fetchInsights();
+      fetchClusters();
     }
 
-    window.applySearchAndFilter = function () {
-      const keyword = document.getElementById("searchInput").value.toLowerCase().trim();
-      const diet    = document.getElementById("dietFilter").value.toLowerCase();
+    // ── RECIPE TABLE + SEARCH + PAGINATION ───────────────
+    function loadRecipes() {
+      return fetch(API_P3 + "/recipes")
+        .then(function(r){ return r.json(); })
+        .then(function(data){ allRecipes = data; applySearchAndFilter(); })
+        .catch(function(e){ console.error("loadRecipes:", e); });
+    }
 
-      filteredData = allRecipes.filter(r => {
-        const matchKeyword = !keyword ||
+    function applySearchAndFilter() {
+      var keyword = document.getElementById("searchInput").value.toLowerCase().trim();
+      var diet    = document.getElementById("dietFilter").value.toLowerCase();
+
+      filteredData = allRecipes.filter(function(r){
+        var matchKeyword = !keyword ||
           r["Recipe_name"].toLowerCase().includes(keyword) ||
           r["Cuisine_type"].toLowerCase().includes(keyword) ||
           r["Diet_type"].toLowerCase().includes(keyword);
-        const matchDiet = !diet || r["Diet_type"].toLowerCase() === diet;
+        var matchDiet = !diet || r["Diet_type"].toLowerCase() === diet;
         return matchKeyword && matchDiet;
       });
 
       currentPage = 1;
       renderResultsTable();
       renderPagination();
-
-      // update charts to match filter
       if (cachedInsights) { renderBarChart(cachedInsights, diet); renderPieChart(cachedInsights, diet); }
       if (cachedClusters) { renderScatterChart(cachedClusters, diet); }
-    };
+    }
 
     function renderResultsTable() {
-      const tbody = document.getElementById("resultsBody");
-      document.getElementById("resultsCount").textContent = `(${filteredData.length} results)`;
-      const slice = filteredData.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE);
+      var tbody = document.getElementById("resultsBody");
+      document.getElementById("resultsCount").textContent = "(" + filteredData.length + " results)";
+      var slice = filteredData.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE);
       if (!slice.length) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px;">No recipes found.</td></tr>`;
+        tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;color:#aaa;padding:20px;'>No recipes found.</td></tr>";
         return;
       }
-      tbody.innerHTML = slice.map(r => `
-        <tr>
-          <td>${r["Recipe_name"]}</td>
-          <td style="text-transform:capitalize">${r["Diet_type"]}</td>
-          <td style="text-transform:capitalize">${r["Cuisine_type"]}</td>
-        </tr>`).join("");
+      tbody.innerHTML = slice.map(function(r){
+        return "<tr><td>" + r["Recipe_name"] + "</td><td style='text-transform:capitalize'>" + r["Diet_type"] + "</td><td style='text-transform:capitalize'>" + r["Cuisine_type"] + "</td></tr>";
+      }).join("");
     }
 
     function renderPagination() {
-      const container  = document.getElementById("paginationControls");
-      const totalPages = Math.ceil(filteredData.length / PER_PAGE);
+      var container  = document.getElementById("paginationControls");
+      var totalPages = Math.ceil(filteredData.length / PER_PAGE);
       if (totalPages <= 1) { container.innerHTML = ""; return; }
-      let html = `<button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage===1?"disabled":""}>Previous</button>`;
-      for (let i = 1; i <= totalPages; i++)
-        html += `<button class="page-btn ${i===currentPage?"active":""}" onclick="changePage(${i})">${i}</button>`;
-      html += `<button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===totalPages?"disabled":""}>Next</button>`;
+      var html = "<button class='page-btn' onclick='changePage(" + (currentPage-1) + ")' " + (currentPage===1?"disabled":"") + ">Previous</button>";
+      for (var i = 1; i <= totalPages; i++)
+        html += "<button class='page-btn " + (i===currentPage?"active":"") + "' onclick='changePage(" + i + ")'>" + i + "</button>";
+      html += "<button class='page-btn' onclick='changePage(" + (currentPage+1) + ")' " + (currentPage===totalPages?"disabled":"") + ">Next</button>";
       container.innerHTML = html;
     }
 
-    window.changePage = function (page) {
-      const totalPages = Math.ceil(filteredData.length / PER_PAGE);
+    function changePage(page) {
+      var totalPages = Math.ceil(filteredData.length / PER_PAGE);
       if (page < 1 || page > totalPages) return;
-      currentPage = page; renderResultsTable(); renderPagination();
-    };
-
-    // ── INIT (called after login) ──────────────────
-    async function initDashboard() {
-      await fetchInsights();
-      await fetchClusters();
-      await loadRecipes();
+      currentPage = page;
+      renderResultsTable();
+      renderPagination();
     }
 
+    // ── INIT ─────────────────────────────────────────────
+    function initDashboard() {
+      fetchInsights();
+      fetchClusters();
+      loadRecipes();
+    }
   </script>
 </body>
 </html>
