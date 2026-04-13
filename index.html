@@ -30,7 +30,6 @@
     header { background-color: #3a56d4; color: white; padding: 16px 36px; display: flex; justify-content: space-between; align-items: center; }
     .header-title { font-size: 1.25rem; font-weight: 600; }
     .header-user { display: flex; align-items: center; gap: 14px; font-size: 0.9rem; }
-    .header-user span { opacity: 0.9; }
     .logout-btn { padding: 7px 16px; background: #ef4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
     .logout-btn:hover { background: #dc2626; }
     main { flex: 1; padding: 36px 40px; max-width: 1400px; width: 100%; margin: 0 auto; }
@@ -50,7 +49,6 @@
     .filter-controls input { padding: 8px 14px; border: 1px solid #d0d4dd; border-radius: 6px; font-size: 0.88rem; width: 260px; outline: none; background: white; }
     .filter-controls input:focus { border-color: #3a56d4; }
     .filter-controls select { padding: 8px 14px; border: 1px solid #d0d4dd; border-radius: 6px; font-size: 0.88rem; background: white; outline: none; cursor: pointer; }
-    .filter-controls select:focus { border-color: #3a56d4; }
 
     /* BUTTONS */
     .api-section { margin-bottom: 36px; }
@@ -87,14 +85,13 @@
     /* FOOTER */
     footer { background-color: #3a56d4; color: rgba(255,255,255,0.9); text-align: center; padding: 16px; font-size: 0.82rem; }
 
-    /* RESPONSIVE */
     @media (max-width: 900px) { .chart-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 520px) { .chart-grid { grid-template-columns: 1fr; } main { padding: 20px 16px; } }
   </style>
 </head>
 <body>
 
-  <!-- LOGIN PAGE (Person C) -->
+  <!-- LOGIN PAGE -->
   <div id="loginPage" class="login-container">
     <div class="login-box">
       <h2>Welcome back</h2>
@@ -114,19 +111,17 @@
     </div>
   </div>
 
-  <!-- DASHBOARD (shown after login) -->
+  <!-- DASHBOARD -->
   <div id="dashboard">
     <header>
       <span class="header-title">Nutritional Insights</span>
       <div class="header-user">
         <span>&#128100; <span id="userName"></span></span>
-        <button class="logout-btn" onclick="logout()">Logout</button>
+        <button class="logout-btn" onclick="doLogout()">Logout</button>
       </div>
     </header>
 
     <main>
-
-      <!-- CHARTS -->
       <section class="filters-section">
         <h2>Explore Nutritional Insights</h2>
         <div class="chart-grid">
@@ -153,7 +148,6 @@
         </div>
       </section>
 
-      <!-- FILTERS (Person B) -->
       <section class="filters-section">
         <h2>Filters and Data Interaction</h2>
         <div class="filter-controls">
@@ -164,7 +158,6 @@
         </div>
       </section>
 
-      <!-- API BUTTONS -->
       <section class="api-section">
         <h2>API Data Interaction</h2>
         <div class="api-buttons">
@@ -174,13 +167,10 @@
         </div>
       </section>
 
-      <!-- RECIPE RESULTS + PAGINATION (Person B) -->
       <section class="results-section">
         <h2>Recipe Results <span id="resultsCount" style="font-weight:400;font-size:0.9rem;color:#666;"></span></h2>
         <table class="results-table">
-          <thead>
-            <tr><th>Recipe Name</th><th>Diet Type</th><th>Cuisine</th></tr>
-          </thead>
+          <thead><tr><th>Recipe Name</th><th>Diet Type</th><th>Cuisine</th></tr></thead>
           <tbody id="resultsBody">
             <tr><td colspan="3" style="text-align:center;color:#aaa;padding:20px;">Loading recipes...</td></tr>
           </tbody>
@@ -188,7 +178,6 @@
         <div class="pagination" id="paginationControls"></div>
       </section>
 
-      <!-- SECURITY & COMPLIANCE (Person C) -->
       <section class="security-section">
         <h2>Security &amp; Compliance</h2>
         <div class="security-card">
@@ -198,17 +187,18 @@
           <p>Compliance: <span class="status-ok">GDPR Compliant</span></p>
         </div>
       </section>
-
     </main>
+
     <footer>&#169; 2025 Nutritional Insights. All Rights Reserved.</footer>
   </div>
 
-  <!-- FIREBASE AUTH (Person C) -->
+  <!-- ALL SCRIPTS IN ONE BLOCK — avoids module scope isolation issues -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, GithubAuthProvider, signInWithPopup }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
+    // ── FIREBASE SETUP ─────────────────────────────
     const app  = initializeApp({
       apiKey:            "AIzaSyBwMdd7WwmnBG_Fzl4n2_Tn8Aum209kHqg",
       authDomain:        "diet-dashboard-be3ce.firebaseapp.com",
@@ -225,12 +215,13 @@
     }
 
     function showDashboard(email) {
-      document.getElementById("loginPage").style.display = "none";
-      document.getElementById("dashboard").style.display = "flex";
-      document.getElementById("userName").textContent    = email;
-      window.initDashboard();
+      document.getElementById("loginPage").style.display  = "none";
+      document.getElementById("dashboard").style.display  = "flex";
+      document.getElementById("userName").textContent     = email;
+      initDashboard();
     }
 
+    // expose auth functions to onclick handlers
     window.login = async function () {
       try {
         const r = await signInWithEmailAndPassword(auth,
@@ -250,24 +241,23 @@
       catch (e) { showError(e.message); }
     };
 
-    window.logout         = function () { location.reload(); };
-    window.togglePassword = function () {
+    window.doLogout        = function () { location.reload(); };
+    window.togglePassword  = function () {
       const p = document.getElementById("password");
       p.type = p.type === "password" ? "text" : "password";
     };
-  </script>
 
-  <!-- DASHBOARD LOGIC — charts + search + pagination (Person B) -->
-  <script>
+    // ── API URLS ───────────────────────────────────
     const API_BASE = "https://dietinsightsapi-west.azurewebsites.net/api";
     const API_P3   = "https://moin-processor-p3-h0f2azajhnh9g5fu.westus3-01.azurewebsites.net/api";
     const PER_PAGE = 10;
 
+    // ── STATE ──────────────────────────────────────
     let barChartInstance = null, scatterChartInstance = null, pieChartInstance = null;
     let cachedInsights = null, cachedClusters = null;
     let allRecipes = [], filteredData = [], currentPage = 1;
 
-    // HEATMAP
+    // ── HEATMAP ────────────────────────────────────
     function renderHeatmap(rawData) {
       const labels = ["Protein(g)", "Carbs(g)", "Fat(g)"];
       const canvas = document.getElementById("heatmapCanvas");
@@ -282,8 +272,16 @@
         labels.forEach((colLabel, c) => {
           const val = rawData[rowLabel][colLabel];
           let red, green, blue;
-          if (val >= 0) { red = Math.round(240*val+255*(1-val)); green = Math.round(165*val+255*(1-val)); blue = Math.round(255*(1-val)); }
-          else { const t=-val; red=Math.round(255*(1-t)+58*t); green=Math.round(255*(1-t)+86*t); blue=Math.round(255*(1-t)+212*t); }
+          if (val >= 0) {
+            red = Math.round(240*val + 255*(1-val));
+            green = Math.round(165*val + 255*(1-val));
+            blue = Math.round(255*(1-val));
+          } else {
+            const t = -val;
+            red = Math.round(255*(1-t) + 58*t);
+            green = Math.round(255*(1-t) + 86*t);
+            blue = Math.round(255*(1-t) + 212*t);
+          }
           const x = padding + c * cellSize, y = padding + r * cellSize;
           ctx.fillStyle = `rgb(${red},${green},${blue})`;
           ctx.fillRect(x, y, cellSize-2, cellSize-2);
@@ -300,99 +298,112 @@
       });
     }
 
-    // BAR CHART
+    // ── BAR CHART ──────────────────────────────────
     function renderBarChart(rawData, filterDiet = "") {
       if (barChartInstance) barChartInstance.destroy();
       let entries = Object.entries(rawData);
       if (filterDiet) entries = entries.filter(([k]) => k.toLowerCase() === filterDiet.toLowerCase());
       barChartInstance = new Chart(document.getElementById("barChart").getContext("2d"), {
         type: "bar",
-        data: { labels: entries.map(([k]) => k.charAt(0).toUpperCase()+k.slice(1)),
+        data: {
+          labels: entries.map(([k]) => k.charAt(0).toUpperCase()+k.slice(1)),
           datasets: [
             { label:"Protein (g)", data: entries.map(([,v])=>parseFloat(v["Protein(g)"].toFixed(2))), backgroundColor:"#3a56d4" },
             { label:"Carbs (g)",   data: entries.map(([,v])=>parseFloat(v["Carbs(g)"].toFixed(2))),   backgroundColor:"#3aa76d" },
             { label:"Fat (g)",     data: entries.map(([,v])=>parseFloat(v["Fat(g)"].toFixed(2))),     backgroundColor:"#f0a500" }
-          ]},
+          ]
+        },
         options: { responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{ position:"bottom", labels:{ font:{size:10} } } },
           scales:{ x:{ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} } }
       });
     }
 
-    // SCATTER
+    // ── SCATTER CHART ──────────────────────────────
     function renderScatterChart(rawData, filterDiet = "") {
       if (scatterChartInstance) scatterChartInstance.destroy();
       let filtered = rawData;
       if (filterDiet) filtered = rawData.filter(r => r["Diet_type"].toLowerCase() === filterDiet.toLowerCase());
       scatterChartInstance = new Chart(document.getElementById("scatterChart").getContext("2d"), {
-        type:"scatter",
-        data:{ datasets:[{ label:"Protein vs Carbs",
+        type: "scatter",
+        data: { datasets: [{ label:"Protein vs Carbs",
           data: filtered.map(r => ({ x:parseFloat(r["Protein(g)"].toFixed(2)), y:parseFloat(r["Carbs(g)"].toFixed(2)) })),
           backgroundColor:"#7b52d4" }]},
-        options:{ responsive:true, maintainAspectRatio:false,
+        options: { responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{position:"bottom",labels:{font:{size:10}}} },
-          scales:{ x:{title:{display:true,text:"Protein (g)",font:{size:10}},ticks:{font:{size:10}}},
-                   y:{title:{display:true,text:"Carbs (g)",font:{size:10}},ticks:{font:{size:10}}} } }
+          scales:{
+            x:{title:{display:true,text:"Protein (g)",font:{size:10}},ticks:{font:{size:10}}},
+            y:{title:{display:true,text:"Carbs (g)",font:{size:10}},ticks:{font:{size:10}}}
+          } }
       });
     }
 
-    // PIE
+    // ── PIE CHART ──────────────────────────────────
     function renderPieChart(rawData, filterDiet = "") {
       if (pieChartInstance) pieChartInstance.destroy();
       let entries = Object.entries(rawData);
       if (filterDiet) entries = entries.filter(([k]) => k.toLowerCase() === filterDiet.toLowerCase());
       pieChartInstance = new Chart(document.getElementById("pieChart").getContext("2d"), {
-        type:"pie",
-        data:{ labels: entries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)),
-          datasets:[{ data: entries.map(([,v])=>parseFloat(v["Protein(g)"].toFixed(2))),
-            backgroundColor:["#3a56d4","#3aa76d","#7b52d4","#f0a500","#e05050"] }]},
-        options:{ responsive:true, maintainAspectRatio:false,
+        type: "pie",
+        data: {
+          labels: entries.map(([k]) => k.charAt(0).toUpperCase()+k.slice(1)),
+          datasets: [{ data: entries.map(([,v])=>parseFloat(v["Protein(g)"].toFixed(2))),
+            backgroundColor:["#3a56d4","#3aa76d","#7b52d4","#f0a500","#e05050"] }]
+        },
+        options: { responsive:true, maintainAspectRatio:false,
           plugins:{ legend:{position:"bottom",labels:{font:{size:10}}} } }
       });
     }
 
-    // FETCH
+    // ── FETCH FUNCTIONS ────────────────────────────
     async function fetchInsights() {
       try {
         const data = await (await fetch(`${API_BASE}/nutritional_insights`)).json();
-        cachedInsights = data; renderBarChart(data); renderPieChart(data);
+        cachedInsights = data;
+
+        // populate dropdown from insights keys (all 5 diet types)
+        const select = document.getElementById("dietFilter");
+        select.innerHTML = `<option value="">All Diet Types</option>`;
+        Object.keys(data).forEach(d => {
+          const opt = document.createElement("option");
+          opt.value = d; opt.textContent = d.charAt(0).toUpperCase()+d.slice(1);
+          select.appendChild(opt);
+        });
+
+        renderBarChart(data);
+        renderPieChart(data);
         await fetchHeatmap();
-      } catch(e) { console.error("fetchInsights:",e); }
+      } catch(e) { console.error("fetchInsights:", e); }
     }
 
-    async function fetchClusterData() {
+    async function fetchClusters() {
       try {
         const data = await (await fetch(`${API_BASE}/clusters`)).json();
-        cachedClusters = data; renderScatterChart(data);
-      } catch(e) { console.error("fetchClusterData:",e); }
+        cachedClusters = data;
+        renderScatterChart(data);
+      } catch(e) { console.error("fetchClusters:", e); }
     }
 
     async function fetchHeatmap() {
       try {
         const data = await (await fetch(`${API_BASE}/heatmap`)).json();
         renderHeatmap(data);
-      } catch(e) { console.error("fetchHeatmap:",e); }
+      } catch(e) { console.error("fetchHeatmap:", e); }
     }
 
+    // ── REFRESH ALL (API buttons) ──────────────────
     window.refreshAll = async function () {
       await fetchInsights();
-      await fetchClusterData();
+      await fetchClusters();
     };
 
-    // SEARCH + FILTER + PAGINATION (Person B)
+    // ── RECIPE TABLE + SEARCH + PAGINATION ─────────
     async function loadRecipes() {
       try {
         const data = await (await fetch(`${API_P3}/recipes`)).json();
         allRecipes = data;
-        const select = document.getElementById("dietFilter");
-        select.innerHTML = `<option value="">All Diet Types</option>`;
-        [...new Set(data.map(r => r["Diet_type"]))].forEach(d => {
-          const opt = document.createElement("option");
-          opt.value = d; opt.textContent = d.charAt(0).toUpperCase()+d.slice(1);
-          select.appendChild(opt);
-        });
         applySearchAndFilter();
-      } catch(e) { console.error("loadRecipes:",e); }
+      } catch(e) { console.error("loadRecipes:", e); }
     }
 
     window.applySearchAndFilter = function () {
@@ -411,6 +422,8 @@
       currentPage = 1;
       renderResultsTable();
       renderPagination();
+
+      // update charts to match filter
       if (cachedInsights) { renderBarChart(cachedInsights, diet); renderPieChart(cachedInsights, diet); }
       if (cachedClusters) { renderScatterChart(cachedClusters, diet); }
     };
@@ -448,13 +461,13 @@
       currentPage = page; renderResultsTable(); renderPagination();
     };
 
-    // Called by Firebase after successful login
-    window.initDashboard = async function () {
+    // ── INIT (called after login) ──────────────────
+    async function initDashboard() {
       await fetchInsights();
-      await fetchClusterData();
+      await fetchClusters();
       await loadRecipes();
-    };
-  </script>
+    }
 
+  </script>
 </body>
 </html>
